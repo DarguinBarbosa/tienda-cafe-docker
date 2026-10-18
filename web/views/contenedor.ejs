@@ -1,0 +1,66 @@
+<%- include('partials/encabezado') %>
+
+<header class="encabezado-pagina encabezado-pagina--ancho">
+  <h1>Dónde se está ejecutando esta aplicación</h1>
+  <p>
+    <% if (enDocker) { %>
+      <span class="estado estado--si">Dentro de Docker</span>
+      El servidor encontró el archivo <code>/.dockerenv</code>, que Docker crea en todo contenedor.
+    <% } else { %>
+      <span class="estado estado--no">Fuera de Docker</span>
+      La aplicación se está ejecutando directamente en el equipo, no en un contenedor.
+    <% } %>
+  </p>
+</header>
+
+<div class="arquitectura" aria-label="Arquitectura de la solución">
+  <div class="nodo nodo--externo">
+    <strong>Navegador</strong>
+    <span>localhost:3000</span>
+  </div>
+  <div class="flecha" aria-hidden="true"><span>HTTP</span></div>
+  <div class="nodo">
+    <strong>Contenedor web</strong>
+    <span><code><%= web.hostname %></code></span>
+    <span>Node.js <%= web.node %></span>
+  </div>
+  <div class="flecha" aria-hidden="true"><span>TCP 3306</span></div>
+  <div class="nodo">
+    <strong>Contenedor de MySQL</strong>
+    <span><code><%= bd.hostname %></code></span>
+    <span>MySQL <%= bd.version %></span>
+  </div>
+  <div class="flecha flecha--abajo" aria-hidden="true"></div>
+  <div class="nodo nodo--volumen">
+    <strong>Volumen db_data</strong>
+    <span>Los datos sobreviven aunque elimine el contenedor</span>
+  </div>
+</div>
+
+<div class="fichas">
+  <section class="ficha" aria-labelledby="f-web">
+    <h2 id="f-web">Servidor web</h2>
+    <dl>
+      <div><dt>ID del contenedor (hostname)</dt><dd><code><%= web.hostname %></code></dd></div>
+      <div><dt>Imagen</dt><dd><code><%= web.imagen %></code></dd></div>
+      <div><dt>Versión de Node.js</dt><dd><%= web.node %></dd></div>
+      <div><dt>Sistema del contenedor</dt><dd><%= web.sistema %></dd></div>
+      <div><dt>Puerto interno</dt><dd><%= web.puerto %></dd></div>
+      <div><dt>Tiempo en ejecución</dt><dd><%= web.activo %></dd></div>
+    </dl>
+  </section>
+
+  <section class="ficha" aria-labelledby="f-bd">
+    <h2 id="f-bd">Base de datos</h2>
+    <dl>
+      <div><dt>Nombre del servicio en la red</dt><dd><code><%= bd.servicio %></code></dd></div>
+      <div><dt>ID del contenedor (hostname)</dt><dd><code><%= bd.hostname %></code></dd></div>
+      <div><dt>Versión del motor</dt><dd><%= bd.version %></dd></div>
+      <div><dt>Base de datos en uso</dt><dd><code><%= bd.base %></code></dd></div>
+    </dl>
+  </section>
+</div>
+
+<p class="nota">Compara estos identificadores con la salida de <code>docker ps</code>: la columna CONTAINER ID coincide con el hostname de cada contenedor.</p>
+
+<%- include('partials/pie') %>

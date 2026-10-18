@@ -1,0 +1,118 @@
+<%- include('partials/encabezado') %>
+
+<header class="encabezado-pagina encabezado-pagina--ancho">
+  <h1>Lo que hay en la base de datos</h1>
+  <p>Esta página lee directamente las tablas de MySQL cada vez que la abres. Los productos se muestran unidos a su categoría mediante la llave foránea <code>categoria_id</code>.</p>
+</header>
+
+<section class="bloque" aria-labelledby="t-productos">
+  <div class="bloque__cabeza">
+    <h2 id="t-productos">Productos <span class="contador"><%= productos.length %></span></h2>
+    <% if (productos.length > 0) { %>
+      <label class="buscador">
+        <span class="visualmente-oculto">Buscar producto</span>
+        <input type="search" id="buscar" placeholder="Buscar por nombre o categoría" autocomplete="off">
+      </label>
+    <% } %>
+  </div>
+
+  <% if (productos.length === 0) { %>
+    <p class="vacio">La tabla productos está vacía. <a href="/productos/nuevo">Registra el primer producto</a>.</p>
+  <% } else { %>
+    <div class="tabla-contenedor" tabindex="0" role="region" aria-labelledby="t-productos">
+      <table class="tabla" id="tabla-productos">
+        <thead>
+          <tr>
+            <th scope="col">id</th>
+            <th scope="col">Nombre</th>
+            <th scope="col">Categoría</th>
+            <th scope="col" class="num">Precio</th>
+            <th scope="col" class="num">Cantidad</th>
+            <th scope="col">Disponible</th>
+            <th scope="col">Tostión</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% productos.forEach(p => { %>
+            <tr>
+              <td class="cifra"><%= p.id %></td>
+              <td><%= p.nombre %></td>
+              <td><span class="etiqueta" title="categoria_id = <%= p.categoria_id %>"><%= p.categoria_codigo %></span> <%= p.categoria %></td>
+              <td class="num cifra"><%= pesos(p.precio) %></td>
+              <td class="num cifra"><%= p.cantidad %></td>
+              <td><span class="estado <%= p.disponible ? 'estado--si' : 'estado--no' %>"><%= p.disponible ? 'Sí' : 'No' %></span></td>
+              <td><time datetime="<%= p.fecha_tostion %>"><%= fecha(p.fecha_tostion) %></time></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <p class="sin-resultados" id="sin-resultados" hidden>Ningún producto coincide con la búsqueda.</p>
+    </div>
+  <% } %>
+</section>
+
+<section class="bloque" aria-labelledby="t-categorias">
+  <div class="bloque__cabeza">
+    <h2 id="t-categorias">Categorías <span class="contador"><%= categorias.length %></span></h2>
+  </div>
+  <div class="tabla-contenedor" tabindex="0" role="region" aria-labelledby="t-categorias">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">id</th>
+          <th scope="col">Código</th>
+          <th scope="col">Nombre</th>
+          <th scope="col">Descripción</th>
+          <th scope="col">Activa</th>
+          <th scope="col">Creación</th>
+          <th scope="col">Registrada en</th>
+          <th scope="col" class="num">Productos</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% categorias.forEach(c => { %>
+          <tr>
+            <td class="cifra"><%= c.id %></td>
+            <td><span class="etiqueta"><%= c.codigo %></span></td>
+            <td><%= c.nombre %></td>
+            <td class="descripcion"><%= c.descripcion || '' %></td>
+            <td><span class="estado <%= c.activa ? 'estado--si' : 'estado--no' %>"><%= c.activa ? 'Sí' : 'No' %></span></td>
+            <td><time datetime="<%= c.fecha_creacion %>"><%= fecha(c.fecha_creacion) %></time></td>
+            <td class="cifra"><time datetime="<%= c.creado_en %>"><%= fechaHora(c.creado_en) %></time></td>
+            <td class="num cifra"><%= c.total_productos %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<details class="consulta">
+  <summary>Ver la consulta SQL que alimenta la tabla de productos</summary>
+  <pre><code>SELECT p.id, p.nombre, p.precio, p.cantidad, p.disponible, p.fecha_tostion,
+       c.codigo AS categoria_codigo, c.nombre AS categoria
+  FROM productos p
+  INNER JOIN categorias c ON c.id = p.categoria_id
+ ORDER BY p.id;</code></pre>
+</details>
+
+<script>
+  (function () {
+    var campo = document.getElementById('buscar');
+    if (!campo) return;
+    var filas = document.querySelectorAll('#tabla-productos tbody tr');
+    var vacio = document.getElementById('sin-resultados');
+    campo.addEventListener('input', function () {
+      var q = campo.value.trim().toLowerCase();
+      var visibles = 0;
+      filas.forEach(function (f) {
+        var ok = f.textContent.toLowerCase().indexOf(q) !== -1;
+        f.hidden = !ok;
+        if (ok) visibles++;
+      });
+      vacio.hidden = visibles !== 0;
+    });
+  })();
+</script>
+
+<%- include('partials/pie') %>

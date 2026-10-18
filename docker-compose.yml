@@ -1,0 +1,63 @@
+# Orquestación de la Tienda de Café de Origen.
+# Levanta dos contenedores conectados por una red privada:
+#   db   -> MySQL 8.4 con mi script de creación (imagen tienda-cafe-db)
+#   web  -> servidor Node.js con la interfaz (imagen tienda-cafe-web)
+#
+# Uso:  docker compose up -d --build
+# App:  http://localhost:3000
+
+name: tienda-cafe
+
+services:
+  db:
+    build: ./db
+    image: tienda-cafe-db:1.0
+    container_name: tienda-cafe-db
+    restart: unless-stopped
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: America/Bogota
+    ports:
+      - "${DB_PORT_HOST:-3307}:3306"   # 3307 en mi equipo para no chocar con un MySQL local
+    volumes:
+      - db_data:/var/lib/mysql          # persistencia: los datos sobreviven al contenedor
+    networks:
+      - red_cafe
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  web:
+    build: ./web
+    image: tienda-cafe-web:1.0
+    container_name: tienda-cafe-web
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy     # la web arranca solo cuando MySQL ya responde
+    environment:
+      DB_HOST: db                      # nombre del servicio, resuelto por el DNS interno de Docker
+      DB_PORT: 3306
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      DB_NAME: ${MYSQL_DATABASE}
+      APP_IMAGE: tienda-cafe-web:1.0
+      TZ: America/Bogota
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    networks:
+      - red_cafe
+
+volumes:
+  db_data:
+
+networks:
+  red_cafe:
+    driver: bridge

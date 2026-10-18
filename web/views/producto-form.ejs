@@ -1,0 +1,104 @@
+<%- include('partials/encabezado') %>
+
+<% const hayErrores = Object.keys(errores).length > 0; %>
+
+<div class="formulario-pagina">
+  <header class="encabezado-pagina">
+    <h1>Registrar producto</h1>
+    <p>Los campos con asterisco son obligatorios. El producto se guarda en la tabla <code>productos</code> y queda ligado a su categoría.</p>
+  </header>
+
+  <aside class="avance" aria-label="Avance de registros">
+    <%- include('partials/granos', { total, meta }) %>
+    <p><strong><%= Math.min(total, meta) %> de <%= meta %></strong> productos</p>
+  </aside>
+
+  <% if (guardado) { %>
+    <div class="aviso aviso--exito" role="status">
+      <strong>Producto guardado.</strong> “<%= guardado %>” ya está en la base de datos.
+      <a href="/registros">Ver registros</a>
+    </div>
+  <% } %>
+
+  <% if (hayErrores) { %>
+    <div class="aviso aviso--error" role="alert" tabindex="-1" id="resumen-errores">
+      <strong>Revisa <%= Object.keys(errores).length === 1 ? 'un campo' : Object.keys(errores).length + ' campos' %> antes de guardar:</strong>
+      <ul>
+        <% Object.entries(errores).forEach(([campo, msj]) => { %>
+          <li><a href="#<%= campo %>"><%= msj %></a></li>
+        <% }) %>
+      </ul>
+    </div>
+  <% } %>
+
+  <% if (categorias.length === 0) { %>
+    <div class="aviso">No hay categorías activas. <a href="/categorias/nueva">Crea una categoría</a> antes de registrar productos.</div>
+  <% } %>
+
+  <form class="formulario" method="post" action="/productos" novalidate>
+    <div class="campo <%= errores.categoria_id ? 'campo--error' : '' %>">
+      <label for="categoria_id">Categoría *</label>
+      <select id="categoria_id" name="categoria_id" required <%- errores.categoria_id ? 'aria-invalid="true" aria-describedby="categoria_id-error"' : '' %>>
+        <option value="">Elige una categoría</option>
+        <% categorias.forEach(c => { %>
+          <option value="<%= c.id %>" <%= String(valores.categoria_id) === String(c.id) ? 'selected' : '' %>><%= c.nombre %></option>
+        <% }) %>
+      </select>
+      <% if (errores.categoria_id) { %><p class="campo__error" id="categoria_id-error"><%= errores.categoria_id %></p><% } %>
+    </div>
+
+    <div class="campo <%= errores.nombre ? 'campo--error' : '' %>">
+      <label for="nombre">Nombre del producto *</label>
+      <input id="nombre" name="nombre" type="text" maxlength="100" required autocomplete="off"
+             placeholder="Huila lavado 500 g" value="<%= valores.nombre || '' %>"
+             <%- errores.nombre ? 'aria-invalid="true" aria-describedby="nombre-error"' : '' %>>
+      <% if (errores.nombre) { %><p class="campo__error" id="nombre-error"><%= errores.nombre %></p><% } %>
+    </div>
+
+    <div class="fila">
+      <div class="campo <%= errores.precio ? 'campo--error' : '' %>">
+        <label for="precio">Precio (COP) *</label>
+        <input id="precio" name="precio" type="number" min="0" max="99999999.99" step="0.01" required inputmode="decimal"
+               placeholder="38000" value="<%= valores.precio ?? '' %>"
+               <%- errores.precio ? 'aria-invalid="true" aria-describedby="precio-error"' : 'aria-describedby="precio-ayuda"' %>>
+        <p class="campo__ayuda" id="precio-ayuda">Sin puntos ni signo de pesos.</p>
+        <% if (errores.precio) { %><p class="campo__error" id="precio-error"><%= errores.precio %></p><% } %>
+      </div>
+
+      <div class="campo <%= errores.cantidad ? 'campo--error' : '' %>">
+        <label for="cantidad">Cantidad en bodega *</label>
+        <input id="cantidad" name="cantidad" type="number" min="0" max="65535" step="1" required inputmode="numeric"
+               placeholder="24" value="<%= valores.cantidad ?? '' %>"
+               <%- errores.cantidad ? 'aria-invalid="true" aria-describedby="cantidad-error"' : '' %>>
+        <% if (errores.cantidad) { %><p class="campo__error" id="cantidad-error"><%= errores.cantidad %></p><% } %>
+      </div>
+    </div>
+
+    <div class="campo <%= errores.fecha_tostion ? 'campo--error' : '' %>">
+      <label for="fecha_tostion">Fecha de tostión *</label>
+      <input id="fecha_tostion" name="fecha_tostion" type="date" required value="<%= valores.fecha_tostion || '' %>"
+             <%- errores.fecha_tostion ? 'aria-invalid="true" aria-describedby="fecha_tostion-error"' : 'aria-describedby="fecha-ayuda"' %>>
+      <p class="campo__ayuda" id="fecha-ayuda">Para accesorios, usa la fecha en que llegaron a la tienda.</p>
+      <% if (errores.fecha_tostion) { %><p class="campo__error" id="fecha_tostion-error"><%= errores.fecha_tostion %></p><% } %>
+    </div>
+
+    <label class="interruptor">
+      <input type="checkbox" name="disponible" <%= valores.disponible ? 'checked' : '' %>>
+      <span class="interruptor__pista" aria-hidden="true"></span>
+      <span>Disponible para la venta</span>
+    </label>
+
+    <div class="acciones">
+      <button class="boton" type="submit" <%= categorias.length === 0 ? 'disabled' : '' %>>Guardar producto</button>
+      <a class="boton boton--secundario" href="/registros">Ver la base de datos</a>
+    </div>
+  </form>
+</div>
+
+<% if (hayErrores) { %>
+  <script>document.getElementById('resumen-errores').focus();</script>
+<% } else { %>
+  <script>document.getElementById('<%= guardado ? 'nombre' : 'categoria_id' %>').focus();</script>
+<% } %>
+
+<%- include('partials/pie') %>

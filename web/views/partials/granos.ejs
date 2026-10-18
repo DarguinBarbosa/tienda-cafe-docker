@@ -1,0 +1,7 @@
+<%# Medidor de avance: un grano por cada producto, hasta completar la meta de 15 %>
+<% const llenos = Math.min(total, meta); %>
+<div class="granos" role="img" aria-label="<%= llenos %> de <%= meta %> productos registrados">
+  <% for (let i = 0; i < meta; i++) { %>
+    <svg class="granos__grano <%= i < llenos ? 'granos__grano--lleno' : '' %>" style="--i: <%= i %>" aria-hidden="true"><use href="#grano"/></svg>
+  <% } %>
+</div>

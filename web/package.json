@@ -1,0 +1,18 @@
+{
+  "name": "tienda-cafe-web",
+  "version": "1.0.0",
+  "description": "Aplicación web contenerizada para registrar el inventario de una tienda de café de origen",
+  "main": "src/server.js",
+  "private": true,
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "ejs": "^3.1.10",
+    "express": "^4.21.2",
+    "mysql2": "^3.11.5"
+  }
+}

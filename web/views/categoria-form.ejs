@@ -1,0 +1,81 @@
+<%- include('partials/encabezado') %>
+
+<% const hayErrores = Object.keys(errores).length > 0; %>
+
+<div class="formulario-pagina formulario-pagina--sola">
+  <header class="encabezado-pagina">
+    <h1>Registrar categoría</h1>
+    <p>Las categorías agrupan los productos. Se guardan en la tabla <code>categorias</code>, que es la tabla padre de la relación.</p>
+  </header>
+
+  <% if (guardado) { %>
+    <div class="aviso aviso--exito" role="status">
+      <strong>Categoría guardada.</strong> “<%= guardado %>” ya aparece en el formulario de productos.
+      <a href="/productos/nuevo">Registrar un producto</a>
+    </div>
+  <% } %>
+
+  <% if (hayErrores) { %>
+    <div class="aviso aviso--error" role="alert" tabindex="-1" id="resumen-errores">
+      <strong>Revisa <%= Object.keys(errores).length === 1 ? 'un campo' : Object.keys(errores).length + ' campos' %> antes de guardar:</strong>
+      <ul>
+        <% Object.entries(errores).forEach(([campo, msj]) => { %>
+          <li><a href="#<%= campo %>"><%= msj %></a></li>
+        <% }) %>
+      </ul>
+    </div>
+  <% } %>
+
+  <form class="formulario" method="post" action="/categorias" novalidate>
+    <div class="fila fila--codigo">
+      <div class="campo <%= errores.codigo ? 'campo--error' : '' %>">
+        <label for="codigo">Código *</label>
+        <input id="codigo" name="codigo" type="text" minlength="4" maxlength="4" required autocomplete="off"
+               class="mayusculas" placeholder="TOST" pattern="[A-Za-z0-9]{4}" value="<%= valores.codigo || '' %>"
+               <%- errores.codigo ? 'aria-invalid="true" aria-describedby="codigo-error"' : 'aria-describedby="codigo-ayuda"' %>>
+        <p class="campo__ayuda" id="codigo-ayuda">4 letras o números.</p>
+        <% if (errores.codigo) { %><p class="campo__error" id="codigo-error"><%= errores.codigo %></p><% } %>
+      </div>
+
+      <div class="campo <%= errores.nombre ? 'campo--error' : '' %>">
+        <label for="nombre">Nombre *</label>
+        <input id="nombre" name="nombre" type="text" maxlength="60" required autocomplete="off"
+               placeholder="Cafés especiales" value="<%= valores.nombre || '' %>"
+               <%- errores.nombre ? 'aria-invalid="true" aria-describedby="nombre-error"' : '' %>>
+        <% if (errores.nombre) { %><p class="campo__error" id="nombre-error"><%= errores.nombre %></p><% } %>
+      </div>
+    </div>
+
+    <div class="campo <%= errores.descripcion ? 'campo--error' : '' %>">
+      <label for="descripcion">Descripción</label>
+      <textarea id="descripcion" name="descripcion" rows="3" maxlength="500"
+                placeholder="Qué tipo de productos agrupa esta categoría"
+                <%- errores.descripcion ? 'aria-invalid="true" aria-describedby="descripcion-error"' : '' %>><%= valores.descripcion || '' %></textarea>
+      <% if (errores.descripcion) { %><p class="campo__error" id="descripcion-error"><%= errores.descripcion %></p><% } %>
+    </div>
+
+    <div class="campo <%= errores.fecha_creacion ? 'campo--error' : '' %>">
+      <label for="fecha_creacion">Fecha de creación *</label>
+      <input id="fecha_creacion" name="fecha_creacion" type="date" required value="<%= valores.fecha_creacion || '' %>"
+             <%- errores.fecha_creacion ? 'aria-invalid="true" aria-describedby="fecha_creacion-error"' : '' %>>
+      <% if (errores.fecha_creacion) { %><p class="campo__error" id="fecha_creacion-error"><%= errores.fecha_creacion %></p><% } %>
+    </div>
+
+    <label class="interruptor">
+      <input type="checkbox" name="activa" <%= valores.activa ? 'checked' : '' %>>
+      <span class="interruptor__pista" aria-hidden="true"></span>
+      <span>Categoría activa (aparece al registrar productos)</span>
+    </label>
+
+    <div class="acciones">
+      <button class="boton" type="submit">Guardar categoría</button>
+      <a class="boton boton--secundario" href="/registros">Ver la base de datos</a>
+    </div>
+  </form>
+</div>
+
+<% if (hayErrores) { %>
+  <script>document.getElementById('resumen-errores').focus();</script>
+<% } %>
+
+<%- include('partials/pie') %>

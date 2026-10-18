@@ -1,0 +1,15 @@
+# Dependencias: se instalan dentro de la imagen con npm ci
+node_modules/
+npm-debug.log*
+
+# Notas personales para grabar el video
+GUION_VIDEO.md
+
+# Sistema operativo y editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Archivos copiados durante la práctica de comandos
+nginx.conf

@@ -1,0 +1,46 @@
+<%- include('partials/encabezado') %>
+
+<section class="portada">
+  <h1 class="portada__titulo">El inventario de la tienda, grano a grano</h1>
+  <p class="portada__texto">
+    Registra los cafés y accesorios que llegan a la tienda. Cada producto queda guardado en MySQL,
+    dentro de su propio contenedor, y puedes consultarlo cuando quieras en la página de la base de datos.
+  </p>
+
+  <%- include('partials/granos', { total: conteo.productos, meta }) %>
+  <p class="granos__leyenda">
+    <% if (conteo.productos >= meta) { %>
+      <strong><%= conteo.productos %> productos registrados.</strong> Ya completaste la meta de <%= meta %>.
+    <% } else { %>
+      <strong><%= conteo.productos %> de <%= meta %></strong> productos registrados. Te faltan <%= meta - conteo.productos %>.
+    <% } %>
+  </p>
+
+  <div class="acciones">
+    <a class="boton" href="/productos/nuevo">Registrar producto</a>
+    <a class="boton boton--secundario" href="/registros">Ver la base de datos</a>
+  </div>
+</section>
+
+<section class="resumen" aria-labelledby="resumen-titulo">
+  <h2 id="resumen-titulo" class="visualmente-oculto">Resumen</h2>
+  <dl class="cifras">
+    <div><dt>Categorías</dt><dd><%= conteo.categorias %></dd></div>
+    <div><dt>Productos</dt><dd><%= conteo.productos %></dd></div>
+  </dl>
+
+  <div class="recientes">
+    <h3>Últimos productos registrados</h3>
+    <% if (ultimos.length === 0) { %>
+      <p class="vacio">Todavía no hay productos. <a href="/productos/nuevo">Registra el primero</a>.</p>
+    <% } else { %>
+      <ul>
+        <% ultimos.forEach(p => { %>
+          <li><span><%= p.nombre %> <small><%= p.categoria %></small></span><span class="cifra"><%= pesos(p.precio) %></span></li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </div>
+</section>
+
+<%- include('partials/pie') %>

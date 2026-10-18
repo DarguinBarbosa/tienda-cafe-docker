@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= titulo %> · Tienda de Café de Origen</title>
+  <meta name="description" content="Inventario de la Tienda de Café de Origen, servido desde un contenedor Docker.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/estilos.css">
+  <link rel="icon" href="/img/grano.svg" type="image/svg+xml">
+</head>
+<body>
+  <a class="saltar" href="#contenido">Ir al contenido</a>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="grano" viewBox="0 0 24 32">
+      <ellipse cx="12" cy="16" rx="11" ry="15"/>
+      <path d="M12 2.5c-4 4.5-4 9 0 13.5s4 9 0 13.5" fill="none" stroke="var(--grano-linea)" stroke-width="2.2" stroke-linecap="round"/>
+    </symbol>
+  </svg>
+
+  <header class="barra">
+    <div class="barra__interior">
+      <a class="marca" href="/">
+        <svg class="marca__icono" aria-hidden="true"><use href="#grano"/></svg>
+        <span>Tienda de Café<br><small>de Origen</small></span>
+      </a>
+      <nav aria-label="Principal">
+        <ul class="menu">
+          <% const enlaces = [
+               ['/', 'Inicio'],
+               ['/productos/nuevo', 'Registrar producto'],
+               ['/categorias/nueva', 'Registrar categoría'],
+               ['/registros', 'Base de datos'],
+               ['/contenedor', 'Contenedor']
+             ]; %>
+          <% enlaces.forEach(([href, texto]) => { %>
+            <li><a href="<%= href %>" <%- ruta === href ? 'aria-current="page"' : '' %>><%= texto %></a></li>
+          <% }) %>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main id="contenido" class="pagina">
