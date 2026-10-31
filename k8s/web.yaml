@@ -1,5 +1,7 @@
 # Servidor web Node.js como Deployment con dos réplicas detrás de un
-# Service de tipo LoadBalancer, que en AKS crea una IP pública en Azure.
+# Service de tipo LoadBalancer. En GKE crea un balanceador de carga de Google
+# Cloud con una IP pública. En minikube la IP externa queda en "pending", pero
+# el Service igual recibe un NodePort, que abro con "minikube service --url".
 ---
 apiVersion: apps/v1
 kind: Deployment

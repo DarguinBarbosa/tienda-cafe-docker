@@ -10,3 +10,4 @@ data:
   DB_NAME: tienda_cafe
   DB_INTENTOS: "60"         # 60 intentos cada 3 s: espera hasta 3 minutos a que MySQL inicialice
   TZ: America/Bogota
+  PLATAFORMA: minikube en Google Cloud Shell   # se muestra en el pie de página; en GKE pondría "Google Kubernetes Engine (GKE)"

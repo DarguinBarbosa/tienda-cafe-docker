@@ -1,10 +1,13 @@
 # Kustomize viene integrado en kubectl. Con un solo comando aplico todo:
 #   kubectl apply -k k8s
 #
-# Antes de aplicar, cambio MI_REGISTRO por el nombre de mi Azure Container
-# Registry (por ejemplo acrcafe12345). Este archivo no lleva tildes a
-# proposito, para poder reemplazar el texto desde PowerShell sin problemas
-# de codificacion.
+# Antes de aplicar, cambio MI_REGISTRO por el prefijo de mis imagenes:
+#   - En minikube (Cloud Shell): "local", porque construyo las imagenes dentro
+#     del Docker de minikube y no necesito un registro.
+#   - En GKE: la ruta de mi repositorio de Artifact Registry, con la forma
+#     REGION-docker.pkg.dev/PROYECTO/REPOSITORIO.
+# Lo hago con sed (ver README). Este archivo no lleva tildes a proposito, para
+# evitar problemas de codificacion al reemplazar el texto.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -18,8 +21,8 @@ resources:
 
 images:
   - name: tienda-cafe-db
-    newName: MI_REGISTRO.azurecr.io/tienda-cafe-db
+    newName: MI_REGISTRO/tienda-cafe-db
     newTag: "1.0"
   - name: tienda-cafe-web
-    newName: MI_REGISTRO.azurecr.io/tienda-cafe-web
+    newName: MI_REGISTRO/tienda-cafe-web
     newTag: "1.0"

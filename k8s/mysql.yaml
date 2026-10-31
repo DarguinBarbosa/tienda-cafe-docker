@@ -39,7 +39,7 @@ spec:
       containers:
         - name: mysql
           # Misma imagen propia de la Unidad 2: mysql:8.4 con mi init.sql.
-          # Kustomize reemplaza el nombre por el de mi Azure Container Registry.
+          # Kustomize reemplaza el nombre por el de mi Artifact Registry.
           image: tienda-cafe-db:1.0
           args:
             - --character-set-server=utf8mb4
@@ -92,18 +92,21 @@ spec:
           volumeMounts:
             - name: datos
               mountPath: /var/lib/mysql
-              # Los discos de Azure traen la carpeta lost+found en la raíz y MySQL
-              # se niega a inicializar un directorio que no está vacío.
+              # Los discos persistentes con ext4 traen la carpeta lost+found en la
+              # raíz y MySQL se niega a inicializar un directorio que no está vacío.
               # Con subPath monto una subcarpeta limpia del disco.
               subPath: mysql
   # Cada réplica del StatefulSet recibe su propio PersistentVolumeClaim.
-  # En AKS, managed-csi crea un disco administrado de Azure (SSD estándar).
+  # No fijo storageClassName: uso la clase predeterminada del clúster, así el
+  # mismo archivo sirve en minikube y en GKE. En minikube es "standard", que
+  # guarda los datos en una carpeta del nodo; en GKE Autopilot es standard-rwo,
+  # un disco persistente balanceado de Google Cloud. Pido 10 GiB porque es el
+  # tamaño mínimo de ese disco.
   volumeClaimTemplates:
     - metadata:
         name: datos
       spec:
         accessModes: ["ReadWriteOnce"]
-        storageClassName: managed-csi
         resources:
           requests:
-            storage: 4Gi
+            storage: 10Gi
