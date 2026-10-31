@@ -97,3 +97,72 @@ El script `db/init.sql` crea las tablas e inserta tres categorías iniciales. Lo
 1. Código fuente de la aplicación web: carpeta `web/` y archivos de Docker.
 2. Script de la base de datos: `db/init.sql`.
 3. Enlace del video, publicado con visibilidad pública.
+
+## Despliegue en Kubernetes con Azure Kubernetes Service (Unidad 3)
+
+Para el foro de la Unidad 3 desplegué esta misma aplicación en un clúster de AKS. Reutilicé las dos imágenes de la Unidad 2 y reemplacé Docker Compose por manifiestos de Kubernetes, que están en la carpeta `k8s/`.
+
+| Archivo | Recursos |
+|---|---|
+| `k8s/namespace.yaml` | Namespace `tienda-cafe`. |
+| `k8s/configmap.yaml` | Configuración no secreta: host, puerto y nombre de la base, zona horaria. |
+| `k8s/mysql.yaml` | Service sin IP propia y StatefulSet de MySQL con un PersistentVolumeClaim de 4 GiB sobre un disco administrado de Azure. |
+| `k8s/web.yaml` | Deployment del servidor web con dos réplicas y un Service de tipo LoadBalancer que publica una IP pública. |
+| `k8s/kustomization.yaml` | Une los archivos anteriores y reemplaza el nombre de las imágenes por el de mi Azure Container Registry. |
+| `k8s/extra/hpa.yaml` | Escalado automático del servidor web entre 2 y 4 réplicas según el uso de CPU. |
+
+Las contraseñas no están en el repositorio: las guardo en un Secret que creo con `kubectl`.
+
+### Pasos que sigo en PowerShell
+
+Defino las variables una vez por sesión. La región debe ser una de las permitidas en mi suscripción de Azure for Students.
+
+```powershell
+$RG = "rg-tienda-cafe"; $AKS = "aks-tienda-cafe"; $REGION = "eastus2"; $ACR = "acrcafe12345"
+```
+
+Creo el registro y el clúster:
+
+```powershell
+az group create --name $RG --location $REGION
+az acr create --resource-group $RG --name $ACR --sku Basic
+az aks create --resource-group $RG --name $AKS --location $REGION --tier free --node-count 1 --node-vm-size Standard_D2as_v5 --attach-acr $ACR --generate-ssh-keys
+az aks get-credentials --resource-group $RG --name $AKS
+```
+
+Construyo y subo las imágenes desde mi equipo con Docker Desktop:
+
+```powershell
+az acr login --name $ACR
+docker build --platform linux/amd64 -t "$ACR.azurecr.io/tienda-cafe-db:1.0" ./db
+docker build --platform linux/amd64 -t "$ACR.azurecr.io/tienda-cafe-web:1.0" ./web
+docker push "$ACR.azurecr.io/tienda-cafe-db:1.0"
+docker push "$ACR.azurecr.io/tienda-cafe-web:1.0"
+```
+
+Despliego la aplicación:
+
+```powershell
+(Get-Content k8s\kustomization.yaml) -replace 'MI_REGISTRO', $ACR | Set-Content k8s\kustomization.yaml
+kubectl apply -f k8s/namespace.yaml
+kubectl create secret generic tienda-cafe-secretos -n tienda-cafe --from-literal=MYSQL_ROOT_PASSWORD=root_cafe_2026 --from-literal=MYSQL_USER=app --from-literal=MYSQL_PASSWORD=app_cafe_2026
+kubectl apply -k k8s
+kubectl get service web -n tienda-cafe --watch
+```
+
+Cuando la columna EXTERNAL-IP muestra una dirección, abro `http://<EXTERNAL-IP>` en el navegador.
+
+### Qué cambié en la aplicación para Kubernetes
+
+* La página `/contenedor` detecta Kubernetes con la variable `KUBERNETES_SERVICE_HOST`, porque los nodos de AKS usan containerd y no crean el archivo `/.dockerenv`. Muestra el pod, el nodo, el namespace y la IP que entrega la Downward API.
+* Separé las sondas: `/vivo` responde sin consultar la base y lo uso como livenessProbe; `/salud` sí consulta MySQL y lo uso como readinessProbe. Así, si la base falla, Kubernetes deja de enviar tráfico a los pods web sin reiniciarlos en cascada.
+* La aplicación atiende la señal SIGTERM y cierra sus conexiones, por eso los rolling updates no esperan el periodo de gracia completo.
+* La versión se fija al construir la imagen con `--build-arg APP_VERSION` y aparece en el encabezado, lo que permite ver el reemplazo de pods durante una actualización.
+
+### Para no gastar créditos
+
+Al terminar elimino todo con un solo comando, que borra también el grupo de recursos de los nodos:
+
+```powershell
+az group delete --name $RG --yes --no-wait
+```
