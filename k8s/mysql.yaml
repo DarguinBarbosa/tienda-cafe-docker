@@ -1,0 +1,109 @@
+# Base de datos MySQL como StatefulSet.
+# Uso StatefulSet y no Deployment porque la base tiene estado: el pod conserva
+# un nombre estable (mysql-0) y siempre se reconecta al mismo disco.
+---
+# Service sin IP propia (headless). Da al pod un nombre DNS estable: "mysql".
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+spec:
+  clusterIP: None
+  selector:
+    app: mysql
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: mysql
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+spec:
+  serviceName: mysql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: mysql
+          # Misma imagen propia de la Unidad 2: mysql:8.4 con mi init.sql.
+          # Kustomize reemplaza el nombre por el de mi Azure Container Registry.
+          image: tienda-cafe-db:1.0
+          args:
+            - --character-set-server=utf8mb4
+            - --collation-server=utf8mb4_unicode_ci
+          ports:
+            - name: mysql
+              containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: tienda-cafe-secretos, key: MYSQL_ROOT_PASSWORD }
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef: { name: tienda-cafe-secretos, key: MYSQL_USER }
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: tienda-cafe-secretos, key: MYSQL_PASSWORD }
+            - name: MYSQL_DATABASE
+              valueFrom:
+                configMapKeyRef: { name: tienda-cafe-config, key: DB_NAME }
+            - name: TZ
+              valueFrom:
+                configMapKeyRef: { name: tienda-cafe-config, key: TZ }
+          # La primera vez MySQL ejecuta init.sql con un servidor temporal que no
+          # escucha por TCP. El startupProbe le da hasta 5 minutos para terminar;
+          # mientras no pase, Kubernetes no evalúa el livenessProbe y no lo reinicia.
+          startupProbe:
+            exec:
+              command: ["sh", "-c", "mysqladmin ping -h 127.0.0.1 --silent"]
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "mysqladmin ping -h 127.0.0.1 --silent"]
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "mysqladmin ping -h 127.0.0.1 --silent"]
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: datos
+              mountPath: /var/lib/mysql
+              # Los discos de Azure traen la carpeta lost+found en la raíz y MySQL
+              # se niega a inicializar un directorio que no está vacío.
+              # Con subPath monto una subcarpeta limpia del disco.
+              subPath: mysql
+  # Cada réplica del StatefulSet recibe su propio PersistentVolumeClaim.
+  # En AKS, managed-csi crea un disco administrado de Azure (SSD estándar).
+  volumeClaimTemplates:
+    - metadata:
+        name: datos
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: managed-csi
+        resources:
+          requests:
+            storage: 4Gi

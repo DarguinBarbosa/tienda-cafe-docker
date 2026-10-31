@@ -1,0 +1,12 @@
+# Configuración que no es secreta. Las contraseñas van en un Secret que creo
+# con kubectl (ver README), para no guardarlas en el repositorio.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tienda-cafe-config
+data:
+  DB_HOST: mysql            # nombre del Service de MySQL, resuelto por el DNS del clúster
+  DB_PORT: "3306"
+  DB_NAME: tienda_cafe
+  DB_INTENTOS: "60"         # 60 intentos cada 3 s: espera hasta 3 minutos a que MySQL inicialice
+  TZ: America/Bogota

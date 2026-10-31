@@ -1,0 +1,7 @@
+# Espacio de nombres propio: aísla los recursos de la tienda del resto del clúster.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tienda-cafe
+  labels:
+    app.kubernetes.io/part-of: tienda-cafe

@@ -1,0 +1,25 @@
+# Kustomize viene integrado en kubectl. Con un solo comando aplico todo:
+#   kubectl apply -k k8s
+#
+# Antes de aplicar, cambio MI_REGISTRO por el nombre de mi Azure Container
+# Registry (por ejemplo acrcafe12345). Este archivo no lleva tildes a
+# proposito, para poder reemplazar el texto desde PowerShell sin problemas
+# de codificacion.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: tienda-cafe
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - mysql.yaml
+  - web.yaml
+
+images:
+  - name: tienda-cafe-db
+    newName: MI_REGISTRO.azurecr.io/tienda-cafe-db
+    newTag: "1.0"
+  - name: tienda-cafe-web
+    newName: MI_REGISTRO.azurecr.io/tienda-cafe-web
+    newTag: "1.0"

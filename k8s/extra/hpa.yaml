@@ -1,0 +1,23 @@
+# Escalado automático del servidor web según el uso de CPU.
+# Lo aplico aparte, después de mostrar el escalado manual, porque mientras
+# exista el HPA es él quien decide el número de réplicas.
+#   kubectl apply -f k8s/extra/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: web
+  namespace: tienda-cafe
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: web
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60   # porcentaje sobre el request de 50m de cada pod

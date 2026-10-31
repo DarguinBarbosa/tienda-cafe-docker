@@ -1,0 +1,107 @@
+# Servidor web Node.js como Deployment con dos réplicas detrás de un
+# Service de tipo LoadBalancer, que en AKS crea una IP pública en Azure.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels:
+    app: web
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5          # guarda versiones anteriores para poder hacer rollback
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1                  # crea un pod nuevo a la vez
+      maxUnavailable: 0            # nunca baja de las réplicas pedidas: cero caída
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      terminationGracePeriodSeconds: 20
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000              # usuario "node" de la imagen node:22-alpine
+      containers:
+        - name: web
+          image: tienda-cafe-web:1.0
+          ports:
+            - name: http
+              containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: tienda-cafe-config
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef: { name: tienda-cafe-secretos, key: MYSQL_USER }
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: tienda-cafe-secretos, key: MYSQL_PASSWORD }
+            # Downward API: Kubernetes le cuenta al contenedor quién es y dónde corre.
+            # La página /contenedor muestra estos datos.
+            - name: POD_NAME
+              valueFrom: { fieldRef: { fieldPath: metadata.name } }
+            - name: POD_NAMESPACE
+              valueFrom: { fieldRef: { fieldPath: metadata.namespace } }
+            - name: NODE_NAME
+              valueFrom: { fieldRef: { fieldPath: spec.nodeName } }
+            - name: POD_IP
+              valueFrom: { fieldRef: { fieldPath: status.podIP } }
+          # Arranque: la app espera a MySQL antes de escuchar (DB_INTENTOS).
+          # Le doy hasta 4 minutos antes de que el livenessProbe empiece a contar.
+          startupProbe:
+            httpGet: { path: /vivo, port: http }
+            periodSeconds: 5
+            failureThreshold: 48
+          # Readiness: el Service solo envía tráfico a pods que alcanzan MySQL.
+          readinessProbe:
+            httpGet: { path: /salud, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # Liveness: reinicia el contenedor solo si Node dejó de responder.
+          livenessProbe:
+            httpGet: { path: /vivo, port: http }
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # Al eliminar un pod, Kubernetes lo saca del Service y le envía SIGTERM
+          # casi a la vez. Esperar 5 segundos antes de apagar le da tiempo a la
+          # red del clúster de dejar de enviarle peticiones: así el rolling
+          # update no corta ninguna.
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "5"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  labels:
+    app: web
+spec:
+  type: LoadBalancer
+  selector:
+    app: web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
