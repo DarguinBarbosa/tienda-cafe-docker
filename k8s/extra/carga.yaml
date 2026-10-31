@@ -1,0 +1,27 @@
+# Pod temporal que genera carga para demostrar el escalado automatico (HPA).
+# Consulta sin parar la tienda a traves del Service "web", dentro del cluster.
+# Uso mi propia imagen web, que ya trae wget, para no depender de Docker Hub.
+#
+#   kubectl apply -f k8s/extra/carga.yaml     (empieza la carga)
+#   kubectl delete -f k8s/extra/carga.yaml    (termina la carga)
+#
+# Igual que kustomization.yaml, antes de usarlo cambio MI_REGISTRO por el
+# prefijo de mis imagenes ("local" en minikube). Sin tildes a proposito.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: carga
+  namespace: tienda-cafe
+  labels:
+    app: carga
+spec:
+  restartPolicy: Never
+  containers:
+    - name: carga
+      image: MI_REGISTRO/tienda-cafe-web:1.0
+      command: ["sh", "-c", "while true; do wget -q -O /dev/null http://web/registros; done"]
+      # Sin requests, GKE Autopilot le asignaria 0,5 vCPU y 2 GiB por defecto.
+      resources:
+        requests:
+          cpu: 250m
+          memory: 256Mi
