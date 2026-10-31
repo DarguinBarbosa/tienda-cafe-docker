@@ -98,71 +98,98 @@ El script `db/init.sql` crea las tablas e inserta tres categorías iniciales. Lo
 2. Script de la base de datos: `db/init.sql`.
 3. Enlace del video, publicado con visibilidad pública.
 
-## Despliegue en Kubernetes con Azure Kubernetes Service (Unidad 3)
+## Despliegue en Kubernetes (Unidad 3)
 
-Para el foro de la Unidad 3 desplegué esta misma aplicación en un clúster de AKS. Reutilicé las dos imágenes de la Unidad 2 y reemplacé Docker Compose por manifiestos de Kubernetes, que están en la carpeta `k8s/`.
+Para el foro de la Unidad 3 seleccioné Google Kubernetes Engine (GKE). No pude crear el clúster administrado: la política de acceso de mi universidad bloquea Azure desde equipos personales (error 53003) y Google Cloud exige un prepago para abrir la facturación. Por eso desplegué la aplicación en un clúster de Kubernetes con minikube dentro de Google Cloud Shell, que es gratuito. Más abajo documento cómo sería el despliegue en GKE con los mismos manifiestos.
+
+Reutilicé las dos imágenes de la Unidad 2 y reemplacé Docker Compose por manifiestos de Kubernetes, que están en la carpeta `k8s/`.
 
 | Archivo | Recursos |
 |---|---|
 | `k8s/namespace.yaml` | Namespace `tienda-cafe`. |
-| `k8s/configmap.yaml` | Configuración no secreta: host, puerto y nombre de la base, zona horaria. |
-| `k8s/mysql.yaml` | Service sin IP propia y StatefulSet de MySQL con un PersistentVolumeClaim de 4 GiB sobre un disco administrado de Azure. |
-| `k8s/web.yaml` | Deployment del servidor web con dos réplicas y un Service de tipo LoadBalancer que publica una IP pública. |
-| `k8s/kustomization.yaml` | Une los archivos anteriores y reemplaza el nombre de las imágenes por el de mi Azure Container Registry. |
+| `k8s/configmap.yaml` | Configuración no secreta: host, puerto y nombre de la base, zona horaria y nombre de la plataforma. |
+| `k8s/mysql.yaml` | Service sin IP propia y StatefulSet de MySQL con un PersistentVolumeClaim de 10 GiB en la clase de disco predeterminada del clúster. |
+| `k8s/web.yaml` | Deployment del servidor web con dos réplicas y un Service de tipo LoadBalancer. |
+| `k8s/kustomization.yaml` | Une los archivos anteriores y pone el prefijo de las imágenes. |
 | `k8s/extra/hpa.yaml` | Escalado automático del servidor web entre 2 y 4 réplicas según el uso de CPU. |
+| `k8s/extra/carga.yaml` | Pod temporal que genera carga para probar el escalado automático. |
 
 Las contraseñas no están en el repositorio: las guardo en un Secret que creo con `kubectl`.
 
-### Pasos que sigo en PowerShell
+### Pasos que sigo en Google Cloud Shell con minikube
 
-Defino las variables una vez por sesión. La región debe ser una de las permitidas en mi suscripción de Azure for Students.
+Cloud Shell ya trae `kubectl`, Docker y Git; además permite usar minikube. Creo el clúster y activo el servidor de métricas, que necesita el escalado automático:
 
-```powershell
-$RG = "rg-tienda-cafe"; $AKS = "aks-tienda-cafe"; $REGION = "eastus2"; $ACR = "acrcafe12345"
+```bash
+minikube start
+minikube addons enable metrics-server
+kubectl get nodes
 ```
 
-Creo el registro y el clúster:
+Descargo el proyecto y construyo las imágenes dentro del Docker de minikube, así el clúster las encuentra sin un registro:
 
-```powershell
-az group create --name $RG --location $REGION
-az acr create --resource-group $RG --name $ACR --sku Basic
-az aks create --resource-group $RG --name $AKS --location $REGION --tier free --node-count 1 --node-vm-size Standard_D2as_v5 --attach-acr $ACR --generate-ssh-keys
-az aks get-credentials --resource-group $RG --name $AKS
-```
-
-Construyo y subo las imágenes desde mi equipo con Docker Desktop:
-
-```powershell
-az acr login --name $ACR
-docker build --platform linux/amd64 -t "$ACR.azurecr.io/tienda-cafe-db:1.0" ./db
-docker build --platform linux/amd64 -t "$ACR.azurecr.io/tienda-cafe-web:1.0" ./web
-docker push "$ACR.azurecr.io/tienda-cafe-db:1.0"
-docker push "$ACR.azurecr.io/tienda-cafe-web:1.0"
+```bash
+git clone https://github.com/DarguinBarbosa/tienda-cafe-docker.git
+cd tienda-cafe-docker
+eval $(minikube docker-env)
+docker build -t local/tienda-cafe-db:1.0 ./db
+docker build -t local/tienda-cafe-web:1.0 ./web
 ```
 
 Despliego la aplicación:
 
-```powershell
-(Get-Content k8s\kustomization.yaml) -replace 'MI_REGISTRO', $ACR | Set-Content k8s\kustomization.yaml
+```bash
+sed -i "s#MI_REGISTRO#local#g" k8s/kustomization.yaml k8s/extra/carga.yaml
 kubectl apply -f k8s/namespace.yaml
 kubectl create secret generic tienda-cafe-secretos -n tienda-cafe --from-literal=MYSQL_ROOT_PASSWORD=root_cafe_2026 --from-literal=MYSQL_USER=app --from-literal=MYSQL_PASSWORD=app_cafe_2026
 kubectl apply -k k8s
-kubectl get service web -n tienda-cafe --watch
+kubectl get pods -n tienda-cafe --watch
 ```
 
-Cuando la columna EXTERNAL-IP muestra una dirección, abro `http://<EXTERNAL-IP>` en el navegador.
+Para abrir la tienda en el navegador, en otra pestaña de Cloud Shell dejo corriendo un reenvío de puerto y uso **Vista previa web en el puerto 8080**. El ciclo vuelve a conectar el reenvío si el pod al que apunta se reemplaza:
+
+```bash
+while true; do kubectl port-forward --address 0.0.0.0 -n tienda-cafe service/web 8080:80; sleep 1; done
+```
+
+En minikube el Service de tipo LoadBalancer no recibe IP externa, pero sí un NodePort. Con él compruebo desde Cloud Shell que las peticiones se reparten entre las réplicas:
+
+```bash
+URL=$(minikube service web -n tienda-cafe --url)
+for i in 1 2 3 4 5 6 7 8; do curl -s $URL/salud; echo; done
+```
+
+### Cómo sería el despliegue en GKE
+
+Con la facturación activa, los manifiestos son los mismos. Solo cambian el lugar donde construyo las imágenes y el prefijo:
+
+```bash
+PROYECTO=$(gcloud config get-value project)
+REGION=us-central1
+REGISTRO=$REGION-docker.pkg.dev/$PROYECTO/tienda-cafe
+gcloud services enable container.googleapis.com artifactregistry.googleapis.com
+gcloud artifacts repositories create tienda-cafe --repository-format=docker --location=$REGION
+gcloud container clusters create-auto tienda-cafe --location=$REGION
+gcloud container clusters get-credentials tienda-cafe --location=$REGION
+gcloud auth configure-docker $REGION-docker.pkg.dev
+docker build -t $REGISTRO/tienda-cafe-db:1.0 ./db && docker push $REGISTRO/tienda-cafe-db:1.0
+docker build -t $REGISTRO/tienda-cafe-web:1.0 ./web && docker push $REGISTRO/tienda-cafe-web:1.0
+sed -i "s#MI_REGISTRO#$REGISTRO#g" k8s/kustomization.yaml k8s/extra/carga.yaml
+```
+
+Después creo el namespace, el Secret y aplico `kubectl apply -k k8s` igual que en minikube. En GKE el Service de tipo LoadBalancer sí recibe una IP pública y el PersistentVolumeClaim crea un disco persistente balanceado. Al terminar borro primero los namespaces, porque GKE conserva los discos al eliminar el clúster y podría no borrar los balanceadores.
 
 ### Qué cambié en la aplicación para Kubernetes
 
-* La página `/contenedor` detecta Kubernetes con la variable `KUBERNETES_SERVICE_HOST`, porque los nodos de AKS usan containerd y no crean el archivo `/.dockerenv`. Muestra el pod, el nodo, el namespace y la IP que entrega la Downward API.
+* La página `/contenedor` detecta Kubernetes con la variable `KUBERNETES_SERVICE_HOST`, porque los nodos usan containerd y no crean el archivo `/.dockerenv`. Muestra el pod, el nodo, el namespace y la IP que entrega la Downward API.
 * Separé las sondas: `/vivo` responde sin consultar la base y lo uso como livenessProbe; `/salud` sí consulta MySQL y lo uso como readinessProbe. Así, si la base falla, Kubernetes deja de enviar tráfico a los pods web sin reiniciarlos en cascada.
 * La aplicación atiende la señal SIGTERM y cierra sus conexiones, por eso los rolling updates no esperan el periodo de gracia completo.
 * La versión se fija al construir la imagen con `--build-arg APP_VERSION` y aparece en el encabezado, lo que permite ver el reemplazo de pods durante una actualización.
 
-### Para no gastar créditos
+### Al terminar
 
-Al terminar elimino todo con un solo comando, que borra también el grupo de recursos de los nodos:
-
-```powershell
-az group delete --name $RG --yes --no-wait
+```bash
+minikube delete
 ```
+
+Borra el clúster de minikube con todo lo que contiene.
