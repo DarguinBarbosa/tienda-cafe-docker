@@ -40,7 +40,7 @@
   <div class="flecha flecha--abajo" aria-hidden="true"></div>
   <div class="nodo nodo--volumen">
     <strong>PersistentVolumeClaim</strong>
-    <span>Disco administrado de Azure: los datos sobreviven aunque el pod se elimine</span>
+    <span>Disco persistente del proveedor de nube: los datos sobreviven aunque el pod se elimine</span>
   </div>
 </div>
 
@@ -71,7 +71,7 @@
   </section>
 </div>
 
-<p class="nota">Compara estos nombres con la salida de <code>kubectl get pods -n tienda-cafe -o wide</code>: la columna NAME coincide con el pod y la columna NODE con el nodo de AKS.</p>
+<p class="nota">Compara estos nombres con la salida de <code>kubectl get pods -n tienda-cafe -o wide</code>: la columna NAME coincide con el pod y la columna NODE con el nodo del clúster.</p>
 
 <% } else { %>
 <div class="arquitectura" aria-label="Arquitectura de la solución">

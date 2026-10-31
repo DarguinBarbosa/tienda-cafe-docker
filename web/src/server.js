@@ -14,12 +14,16 @@ const VERSION = process.env.APP_VERSION || '1.0'; // se fija al construir la ima
 
 // Dónde corre la aplicación. Kubernetes inyecta KUBERNETES_SERVICE_HOST en
 // todos los pods; Docker crea /.dockerenv, pero containerd (el motor de los
-// nodos de AKS) no lo crea, así que reviso primero Kubernetes.
+// nodos de GKE y de los demás proveedores) no lo crea, así que reviso primero
+// Kubernetes.
 const ENTORNO = process.env.KUBERNETES_SERVICE_HOST
   ? 'kubernetes'
   : fs.existsSync('/.dockerenv') ? 'docker' : 'local';
 
 // Datos del pod que entrega la Downward API (ver k8s/web.yaml)
+// Nombre de la plataforma para el pie de página; lo define el ConfigMap.
+const PLATAFORMA = process.env.PLATAFORMA || 'Kubernetes';
+
 const POD = {
   nombre: process.env.POD_NAME || os.hostname(),
   namespace: process.env.POD_NAMESPACE || 'default',
@@ -45,6 +49,7 @@ app.use((req, res, next) => {
   res.locals.contenedor = os.hostname(); // en Docker es el ID corto del contenedor; en Kubernetes, el nombre del pod
   res.locals.entorno = ENTORNO;
   res.locals.pod = POD;
+  res.locals.plataforma = PLATAFORMA;
   res.locals.version = VERSION;
   res.locals.pesos = (v) => formatoPesos.format(Number(v));
   res.locals.fecha = (v) => (v ? formatoFecha.format(new Date(`${String(v).slice(0, 10)}T00:00:00Z`)) : '');
