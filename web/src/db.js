@@ -16,7 +16,9 @@ const pool = mysql.createPool({
 
 // MySQL tarda unos segundos en estar listo la primera vez.
 // Aunque compose espera el healthcheck, reintento por si acaso.
-async function esperarBaseDeDatos(intentos = 20, esperaMs = 3000) {
+// En Kubernetes no hay depends_on: el pod web arranca a la vez que MySQL,
+// por eso el número de intentos se puede ampliar con DB_INTENTOS.
+async function esperarBaseDeDatos(intentos = Number(process.env.DB_INTENTOS || 20), esperaMs = 3000) {
   for (let i = 1; i <= intentos; i++) {
     try {
       await pool.query('SELECT 1');

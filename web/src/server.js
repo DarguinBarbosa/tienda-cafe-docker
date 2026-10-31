@@ -10,6 +10,22 @@ const { validarProducto, validarCategoria } = require('./validacion');
 const app = express();
 const PUERTO = Number(process.env.PORT || 3000);
 const META_REGISTROS = 15; // la actividad pide ingresar 15 datos
+const VERSION = process.env.APP_VERSION || '1.0'; // se fija al construir la imagen
+
+// Dónde corre la aplicación. Kubernetes inyecta KUBERNETES_SERVICE_HOST en
+// todos los pods; Docker crea /.dockerenv, pero containerd (el motor de los
+// nodos de AKS) no lo crea, así que reviso primero Kubernetes.
+const ENTORNO = process.env.KUBERNETES_SERVICE_HOST
+  ? 'kubernetes'
+  : fs.existsSync('/.dockerenv') ? 'docker' : 'local';
+
+// Datos del pod que entrega la Downward API (ver k8s/web.yaml)
+const POD = {
+  nombre: process.env.POD_NAME || os.hostname(),
+  namespace: process.env.POD_NAMESPACE || 'default',
+  nodo: process.env.NODE_NAME || 'desconocido',
+  ip: process.env.POD_IP || 'desconocida'
+};
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '..', 'views'));
@@ -26,7 +42,10 @@ const formatoISO = new Intl.DateTimeFormat('sv-SE', { timeZone: ZONA }); // sv-S
 
 app.use((req, res, next) => {
   res.locals.ruta = req.path;
-  res.locals.contenedor = os.hostname(); // en Docker el hostname es el ID corto del contenedor
+  res.locals.contenedor = os.hostname(); // en Docker es el ID corto del contenedor; en Kubernetes, el nombre del pod
+  res.locals.entorno = ENTORNO;
+  res.locals.pod = POD;
+  res.locals.version = VERSION;
   res.locals.pesos = (v) => formatoPesos.format(Number(v));
   res.locals.fecha = (v) => (v ? formatoFecha.format(new Date(`${String(v).slice(0, 10)}T00:00:00Z`)) : '');
   res.locals.fechaHora = (v) => {
@@ -162,18 +181,17 @@ app.get('/registros', asincrono(async (req, res) => {
 }));
 
 // ---------------------------------------------------------------------
-// Evidencia de ejecución dentro de Docker
+// Evidencia de ejecución dentro de un contenedor (Docker o Kubernetes)
 // ---------------------------------------------------------------------
 app.get('/contenedor', asincrono(async (req, res) => {
   const [[bd]] = await pool.query('SELECT VERSION() AS version, @@hostname AS host, DATABASE() AS base');
-  const enDocker = fs.existsSync('/.dockerenv');
   const segundos = Math.floor(process.uptime());
   res.render('contenedor', {
     titulo: 'Contenedor',
-    enDocker,
     web: {
       hostname: os.hostname(),
-      imagen: process.env.APP_IMAGE || 'tienda-cafe-web',
+      imagen: process.env.APP_IMAGE || `tienda-cafe-web:${VERSION}`,
+      version: VERSION,
       node: process.version,
       sistema: `${os.type()} ${os.release()} (${os.arch()})`,
       puerto: PUERTO,
@@ -188,10 +206,18 @@ app.get('/contenedor', asincrono(async (req, res) => {
   });
 }));
 
-// Endpoint de salud que usa el HEALTHCHECK del contenedor
+// Liveness: solo confirma que el proceso de Node responde.
+// No consulta MySQL a propósito: si la base cae, reiniciar los pods web no
+// la arregla y solo provoca reinicios en cascada.
+app.get('/vivo', (req, res) => {
+  res.json({ estado: 'vivo', pod: POD.nombre, version: VERSION });
+});
+
+// Readiness (y HEALTHCHECK de Docker): el pod recibe tráfico solo si
+// además alcanza la base de datos.
 app.get('/salud', asincrono(async (req, res) => {
   await pool.query('SELECT 1');
-  res.json({ estado: 'ok', contenedor: os.hostname() });
+  res.json({ estado: 'ok', contenedor: os.hostname(), pod: POD.nombre, nodo: POD.nodo, version: VERSION });
 }));
 
 // 404
@@ -211,7 +237,9 @@ app.use((err, req, res, next) => {
   res.status(sinBD ? 503 : 500).render('error', {
     titulo: sinBD ? 'Sin conexión con la base de datos' : 'Algo falló en el servidor',
     mensaje: sinBD
-      ? 'El contenedor de MySQL no responde. Revisa que esté en ejecución con docker compose ps.'
+      ? (ENTORNO === 'kubernetes'
+          ? 'El pod de MySQL no responde. Revisa su estado con kubectl get pods.'
+          : 'El contenedor de MySQL no responde. Revisa que esté en ejecución con docker compose ps.')
       : 'Ocurrió un error inesperado al procesar la solicitud.',
     detalle: err.code || null
   });
@@ -219,7 +247,21 @@ app.use((err, req, res, next) => {
 
 esperarBaseDeDatos()
   .then(() => {
-    app.listen(PUERTO, '0.0.0.0', () => console.log(`Aplicación escuchando en http://localhost:${PUERTO}`));
+    const servidor = app.listen(PUERTO, '0.0.0.0', () =>
+      console.log(`Aplicación ${VERSION} escuchando en el puerto ${PUERTO} (entorno: ${ENTORNO}, pod: ${POD.nombre})`)
+    );
+
+    // Apagado ordenado. Kubernetes envía SIGTERM antes de eliminar un pod
+    // (rolling update, escalado hacia abajo). Node corre como PID 1 dentro del
+    // contenedor y, sin este manejador, ignora la señal: el pod esperaría los
+    // 30 segundos de gracia y luego lo matarían cortando peticiones en curso.
+    const apagar = (senal) => {
+      console.log(`${senal} recibido: dejo de aceptar conexiones y cierro el pool de MySQL`);
+      servidor.close(() => pool.end().finally(() => process.exit(0)));
+      setTimeout(() => process.exit(0), 10000).unref();
+    };
+    process.on('SIGTERM', apagar);
+    process.on('SIGINT', apagar);
   })
   .catch((err) => {
     console.error(err.message);

@@ -1,18 +1,79 @@
 <%- include('partials/encabezado') %>
 
+<% const enK8s = entorno === 'kubernetes'; %>
+
 <header class="encabezado-pagina encabezado-pagina--ancho">
   <h1>Dónde se está ejecutando esta aplicación</h1>
   <p>
-    <% if (enDocker) { %>
+    <% if (enK8s) { %>
+      <span class="estado estado--si">Dentro de Kubernetes</span>
+      Kubernetes inyectó la variable <code>KUBERNETES_SERVICE_HOST</code> en este pod.
+      Si recargo la página, el balanceador puede enviarme a otra réplica y el nombre del pod cambia.
+    <% } else if (entorno === 'docker') { %>
       <span class="estado estado--si">Dentro de Docker</span>
       El servidor encontró el archivo <code>/.dockerenv</code>, que Docker crea en todo contenedor.
     <% } else { %>
-      <span class="estado estado--no">Fuera de Docker</span>
-      La aplicación se está ejecutando directamente en el equipo, no en un contenedor.
+      <span class="estado estado--no">Fuera de un contenedor</span>
+      La aplicación se está ejecutando directamente en el equipo.
     <% } %>
   </p>
 </header>
 
+<% if (enK8s) { %>
+<div class="arquitectura" aria-label="Arquitectura de la solución en Kubernetes">
+  <div class="nodo nodo--externo">
+    <strong>Navegador</strong>
+    <span>IP pública del Service</span>
+  </div>
+  <div class="flecha" aria-hidden="true"><span>LoadBalancer :80</span></div>
+  <div class="nodo">
+    <strong>Pod web</strong>
+    <span><code><%= pod.nombre %></code></span>
+    <span>Nodo <code><%= pod.nodo %></code></span>
+  </div>
+  <div class="flecha" aria-hidden="true"><span>Service mysql :3306</span></div>
+  <div class="nodo">
+    <strong>Pod de MySQL</strong>
+    <span><code><%= bd.hostname %></code></span>
+    <span>MySQL <%= bd.version %></span>
+  </div>
+  <div class="flecha flecha--abajo" aria-hidden="true"></div>
+  <div class="nodo nodo--volumen">
+    <strong>PersistentVolumeClaim</strong>
+    <span>Disco administrado de Azure: los datos sobreviven aunque el pod se elimine</span>
+  </div>
+</div>
+
+<div class="fichas">
+  <section class="ficha" aria-labelledby="f-pod">
+    <h2 id="f-pod">Pod del servidor web</h2>
+    <dl>
+      <div><dt>Nombre del pod</dt><dd><code><%= pod.nombre %></code></dd></div>
+      <div><dt>Namespace</dt><dd><code><%= pod.namespace %></code></dd></div>
+      <div><dt>Nodo del clúster</dt><dd><code><%= pod.nodo %></code></dd></div>
+      <div><dt>IP del pod</dt><dd><code><%= pod.ip %></code></dd></div>
+      <div><dt>Versión de la aplicación</dt><dd><%= web.version %></dd></div>
+      <div><dt>Imagen</dt><dd><code><%= web.imagen %></code></dd></div>
+      <div><dt>Tiempo en ejecución</dt><dd><%= web.activo %></dd></div>
+    </dl>
+  </section>
+
+  <section class="ficha" aria-labelledby="f-bd">
+    <h2 id="f-bd">Base de datos</h2>
+    <dl>
+      <div><dt>Service que resuelve el DNS del clúster</dt><dd><code><%= bd.servicio %></code></dd></div>
+      <div><dt>Pod de MySQL (hostname)</dt><dd><code><%= bd.hostname %></code></dd></div>
+      <div><dt>Versión del motor</dt><dd><%= bd.version %></dd></div>
+      <div><dt>Base de datos en uso</dt><dd><code><%= bd.base %></code></dd></div>
+      <div><dt>Node.js del pod web</dt><dd><%= web.node %></dd></div>
+      <div><dt>Sistema del contenedor</dt><dd><%= web.sistema %></dd></div>
+    </dl>
+  </section>
+</div>
+
+<p class="nota">Compara estos nombres con la salida de <code>kubectl get pods -n tienda-cafe -o wide</code>: la columna NAME coincide con el pod y la columna NODE con el nodo de AKS.</p>
+
+<% } else { %>
 <div class="arquitectura" aria-label="Arquitectura de la solución">
   <div class="nodo nodo--externo">
     <strong>Navegador</strong>
@@ -43,6 +104,7 @@
     <dl>
       <div><dt>ID del contenedor (hostname)</dt><dd><code><%= web.hostname %></code></dd></div>
       <div><dt>Imagen</dt><dd><code><%= web.imagen %></code></dd></div>
+      <div><dt>Versión de la aplicación</dt><dd><%= web.version %></dd></div>
       <div><dt>Versión de Node.js</dt><dd><%= web.node %></dd></div>
       <div><dt>Sistema del contenedor</dt><dd><%= web.sistema %></dd></div>
       <div><dt>Puerto interno</dt><dd><%= web.puerto %></dd></div>
@@ -62,5 +124,6 @@
 </div>
 
 <p class="nota">Compara estos identificadores con la salida de <code>docker ps</code>: la columna CONTAINER ID coincide con el hostname de cada contenedor.</p>
+<% } %>
 
 <%- include('partials/pie') %>

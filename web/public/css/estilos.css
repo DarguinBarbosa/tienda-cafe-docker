@@ -144,6 +144,19 @@ code {
 .marca small { font-weight: 500; color: var(--tenue); font-size: 0.85rem; }
 .marca__icono { width: 22px; height: 30px; fill: var(--tostado); transform: rotate(-18deg); }
 
+/* Etiqueta de versión: permite ver en vivo el rolling update de Kubernetes */
+.version {
+  margin-left: -0.75rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: var(--hoja-suave);
+  color: var(--hoja);
+  font-family: var(--t-titulo);
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+}
+
 .menu {
   list-style: none;
   margin: 0 0 0 auto;
